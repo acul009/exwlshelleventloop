@@ -3331,7 +3331,7 @@ impl<T: 'static> WindowState<T> {
                             window_state.units[idx].reset_present_slot();
                         }
                     }
-                    TimeoutAction::ToDuration(std::time::Duration::from_millis(50))
+                    TimeoutAction::ToDuration(std::time::Duration::from_millis(5))
                 },
             )
             .expect("Cannot insert_source");
