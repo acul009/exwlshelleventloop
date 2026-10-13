@@ -23,6 +23,8 @@ where
     pub id: LayerId,
     #[allow(unused)]
     pub iced_id: IcedId,
+    pub raw: Arc<WindowWrapper>,
+    pub waker: iced_core::shell::Waker,
     pub renderer: P::Renderer,
     pub surface: C::Surface,
     pub state: State<P>,
@@ -87,12 +89,16 @@ where
         application: &Instance<P>,
         compositor: &mut C,
         system_theme: iced_core::theme::Mode,
+        waker: iced_core::shell::Waker,
+        renderer_settings: iced_core::renderer::Settings,
     ) -> &mut Window<P, C> {
         let layerid = window.id();
         let state = State::new(id, application, size, fractal_scale, &window, system_theme);
         let physical_size = state.viewport().physical_size();
-        let surface = compositor.create_surface(window, physical_size.width, physical_size.height);
-        let renderer = compositor.create_renderer();
+        let surface =
+            compositor.create_surface(window.clone(), physical_size.width, physical_size.height);
+        let mut renderer = compositor.create_renderer(renderer_settings);
+        iced_core::Renderer::hint(&mut renderer, state.viewport().scale());
         let _ = self.aliases.insert(layerid, id);
         let _ = self.back_aliases.insert(id, layerid);
 
@@ -101,6 +107,8 @@ where
             Window {
                 id: layerid,
                 iced_id: id,
+                raw: window,
+                waker,
                 renderer,
                 surface,
                 state,

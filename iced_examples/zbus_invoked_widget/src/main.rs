@@ -1,4 +1,5 @@
 use futures::future::pending;
+use iced::advanced::Widget as _;
 use iced::widget::{button, column, container, text, text_input};
 use iced::window::Id;
 use iced::{Element, Length, Task as Command};
@@ -77,7 +78,7 @@ impl Counter {
         )
         .center_x(Length::Fill)
         .center_y(Length::Fill)
-        .into()
+        ._boxed()
     }
     fn subscription(&self) -> iced::Subscription<Message> {
         iced::Subscription::batch(vec![

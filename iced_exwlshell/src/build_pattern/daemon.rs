@@ -80,14 +80,14 @@ impl<'a, T, State, Message, Theme, Renderer, Widget> ViewFn<'a, State, Message, 
 where
     T: Fn(&'a State, iced_core::window::Id) -> Widget,
     State: 'static,
-    Widget: Into<Element<'a, Message, Theme, Renderer>>,
+    Widget: iced_core::Widget<Message, Theme, Renderer> + 'a,
 {
     fn view(
         &self,
         state: &'a State,
         window: iced_core::window::Id,
     ) -> Element<'a, Message, Theme, Renderer> {
-        self(state, window).into()
+        self(state, window)._boxed()
     }
 }
 
@@ -214,7 +214,7 @@ where
             &self,
             state: &'a Self::State,
             window: iced_core::window::Id,
-        ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+        ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
             self.view.view(state, window)
         }
 
@@ -285,7 +285,7 @@ where
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 
@@ -354,7 +354,7 @@ where
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 
@@ -421,7 +421,7 @@ where
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 
@@ -483,7 +483,7 @@ where
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 
@@ -557,7 +557,7 @@ where
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 
@@ -625,7 +625,7 @@ where
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 
@@ -692,12 +692,12 @@ impl<P: Program> Daemon<P> {
             (
                 super::attach(self.raw),
                 hook,
-                redraw_policy.for_wrapped_messages(
-                    |event: &iced_exdevtools::Event<P>| match event {
+                redraw_policy.for_wrapped_messages(|event: &iced_exdevtools::Event<P::Message>| {
+                    match event {
                         iced_exdevtools::Event::Program(message) => Some(message),
                         _ => None,
-                    },
-                ),
+                    }
+                }),
             )
         };
 
@@ -742,7 +742,7 @@ impl<P: Program> Daemon<P> {
     pub fn default_font(self, default_font: Font) -> Self {
         Self {
             settings: Settings {
-                default_font,
+                font: default_font,
                 ..self.settings
             },
             ..self
@@ -784,7 +784,7 @@ impl<P: Program> Daemon<P> {
     ) -> Self {
         Self {
             settings: Settings {
-                default_text_size: default_text_size.into(),
+                text_size: default_text_size.into(),
                 ..self.settings
             },
             ..self

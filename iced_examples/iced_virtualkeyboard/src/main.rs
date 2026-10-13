@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use iced::mouse::{Cursor, Interaction};
 use iced::widget::canvas;
 use iced::widget::canvas::{Cache, Event, Geometry, Path, Text};
@@ -115,11 +116,14 @@ impl KeyboardView {
         use iced::theme::Style;
         Style {
             background_color: Color::TRANSPARENT,
-            text_color: theme.palette().text,
+            text_color: theme.palette().background.base.text,
         }
     }
     fn view(&self) -> iced::Element<'_, Message> {
-        canvas(self).height(Length::Fill).width(Length::Fill).into()
+        canvas(self)
+            .height(Length::Fill)
+            .width(Length::Fill)
+            ._boxed()
     }
 
     fn namespace() -> String {

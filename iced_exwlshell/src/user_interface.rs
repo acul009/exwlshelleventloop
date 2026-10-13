@@ -1,5 +1,5 @@
-use iced_core::{Clipboard, renderer::Style, widget::Operation};
 use iced_core::{Event, Point, Size, event::Status, mouse::Cursor, window::Id};
+use iced_core::{renderer::Style, widget::Operation};
 use iced_program::{Instance, Program};
 use iced_runtime::{
     UserInterface as IcedUserInterface,
@@ -29,6 +29,8 @@ impl<'a, Message, Theme, Renderer, Reclaim>
     UserInterfaceMutGuard<'a, Message, Theme, Renderer, Reclaim>
 where
     Renderer: iced_core::Renderer,
+    Message: 'a,
+    Theme: 'a,
     Reclaim: UserInterfaceReclaim<Message, Theme, Renderer>,
 {
     fn take(&mut self) -> IcedUserInterface<'a, Message, Theme, Renderer> {
@@ -63,11 +65,21 @@ where
         events: &[Event],
         cursor: Cursor,
         renderer: &mut Renderer,
-        clipboard: &mut dyn Clipboard,
+        window: &dyn iced_core::window::Window,
+        waker: &iced_core::shell::Waker,
         messages: &mut Vec<Message>,
+        receipts: &mut Vec<iced_core::shell::Receipt>,
     ) -> (State, Vec<Status>) {
         let mut ui = self.take();
-        let res = ui.update(events, cursor, renderer, clipboard, messages);
+        let res = {
+            let mut bus = iced_core::shell::Bus::new();
+            let result = ui.update(window, waker, events, cursor, renderer, &mut bus);
+            for (message, receipt) in bus.drain() {
+                messages.push(message);
+                receipts.push(receipt);
+            }
+            result
+        };
         self.ui = Some(ui);
         res
     }
@@ -83,8 +95,10 @@ where
         owners: &mut gesture::Owners,
         cursor: Cursor,
         renderer: &mut Renderer,
-        clipboard: &mut dyn Clipboard,
+        window: &dyn iced_core::window::Window,
+        waker: &iced_core::shell::Waker,
         messages: &mut Vec<Message>,
+        receipts: &mut Vec<iced_core::shell::Receipt>,
     ) -> (State, Vec<Status>, bool) {
         let mut ui = self.take();
         let mut result: Option<(State, Vec<Status>)> = None;
@@ -96,7 +110,13 @@ where
                           frame: Option<gesture::Frame>,
                           result: &mut Option<(State, Vec<Status>)>| {
             let ((state, statuses), claim) = gesture::with_current(frame, || {
-                ui.update(events, cursor, renderer, clipboard, messages)
+                let mut bus = iced_core::shell::Bus::new();
+                let result = ui.update(window, waker, events, cursor, renderer, &mut bus);
+                for (message, receipt) in bus.drain() {
+                    messages.push(message);
+                    receipts.push(receipt);
+                }
+                result
             });
             *result = Some(match result.take() {
                 None => (state, statuses),
@@ -158,24 +178,118 @@ fn merge_states(earlier: State, later: State) -> State {
             State::Updated {
                 redraw_request: earlier_redraw,
                 input_method: mut merged_input_method,
-                has_layout_changed: earlier_layout_changed,
+                change: earlier_change,
+                clipboard: mut earlier_clipboard,
                 ..
             },
             State::Updated {
                 mouse_interaction,
                 redraw_request,
                 input_method,
-                has_layout_changed,
+                change,
+                clipboard: mut later_clipboard,
             },
         ) => {
             merged_input_method.merge(&input_method);
+            earlier_clipboard.merge(&mut later_clipboard);
             State::Updated {
                 mouse_interaction,
                 redraw_request: earlier_redraw.min(redraw_request),
                 input_method: merged_input_method,
-                has_layout_changed: earlier_layout_changed || has_layout_changed,
+                change: match (earlier_change, change) {
+                    (iced_runtime::user_interface::Change::Layout, _)
+                    | (_, iced_runtime::user_interface::Change::Layout) => {
+                        iced_runtime::user_interface::Change::Layout
+                    }
+                    (iced_runtime::user_interface::Change::Overlay, _)
+                    | (_, iced_runtime::user_interface::Change::Overlay) => {
+                        iced_runtime::user_interface::Change::Overlay
+                    }
+                    _ => iced_runtime::user_interface::Change::None,
+                },
+                clipboard: earlier_clipboard,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::merge_states;
+    use iced_core::{Clipboard, InputMethod, clipboard, mouse, window::RedrawRequest};
+    use iced_runtime::user_interface::{Change, State};
+
+    #[test]
+    fn batched_updates_preserve_clipboard_requests_and_strongest_invalidation() {
+        let earlier = State::Updated {
+            mouse_interaction: mouse::Interaction::Idle,
+            redraw_request: RedrawRequest::NextFrame,
+            input_method: InputMethod::Disabled,
+            clipboard: Clipboard {
+                reads: vec![clipboard::Kind::Text],
+                write: Some(clipboard::Content::Text("first".into())),
+            },
+            change: Change::Layout,
+        };
+        let later = State::Updated {
+            mouse_interaction: mouse::Interaction::Pointer,
+            redraw_request: RedrawRequest::Wait,
+            input_method: InputMethod::Disabled,
+            clipboard: Clipboard {
+                reads: vec![clipboard::Kind::Html],
+                write: Some(clipboard::Content::Text("last".into())),
+            },
+            change: Change::Overlay,
+        };
+        let State::Updated {
+            mouse_interaction,
+            redraw_request,
+            clipboard,
+            change,
+            ..
+        } = merge_states(earlier, later)
+        else {
+            panic!("updated batches must stay updated");
+        };
+        assert_eq!(mouse_interaction, mouse::Interaction::Pointer);
+        assert_eq!(redraw_request, RedrawRequest::NextFrame);
+        assert_eq!(change, Change::Layout);
+        assert_eq!(
+            clipboard.reads,
+            vec![clipboard::Kind::Text, clipboard::Kind::Html]
+        );
+        assert_eq!(
+            clipboard.write,
+            Some(clipboard::Content::Text("last".into()))
+        );
+    }
+
+    #[test]
+    fn batched_update_keeps_an_earlier_write_when_later_batch_has_none() {
+        let state = |clipboard| State::Updated {
+            mouse_interaction: mouse::Interaction::Idle,
+            redraw_request: RedrawRequest::Wait,
+            input_method: InputMethod::Disabled,
+            clipboard,
+            change: Change::None,
+        };
+        let State::Updated { clipboard, .. } = merge_states(
+            state(Clipboard {
+                reads: vec![],
+                write: Some("copied".to_owned().into()),
+            }),
+            state(Clipboard::new()),
+        ) else {
+            panic!("updated batches must stay updated");
+        };
+        assert_eq!(
+            clipboard.write,
+            Some(clipboard::Content::Text("copied".into()))
+        );
+        assert!(matches!(
+            merge_states(State::Outdated, state(Clipboard::new())),
+            State::Outdated
+        ));
     }
 }
 

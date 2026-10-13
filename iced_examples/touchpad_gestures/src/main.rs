@@ -1,6 +1,6 @@
-use iced::advanced::layout::{Layout, Limits, Node};
+use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::widget::{Operation, Tree, tree};
-use iced::advanced::{Clipboard, Shell, Widget, renderer};
+use iced::advanced::{Shell, Widget, renderer};
 use iced::widget::{column, container, pin, stack, text};
 use iced::window::Id;
 use iced::{
@@ -206,7 +206,7 @@ impl Board {
             .width(Length::Fill)
             .height(Length::Fill)
             .style(move |_: &Theme| container::background(background));
-        GestureArea::new(board, Message::Gesture).into()
+        GestureArea::new(board, Message::Gesture)._boxed()
     }
 
     fn panel_view(&self) -> Element<'_, Message> {
@@ -214,7 +214,7 @@ impl Board {
             .center(Length::Fill)
             .style(|_: &Theme| container::background(Color::from_rgb(0.3, 0.4, 0.8)));
         // The panel receives gestures too, so it can be closed while the pointer is over it.
-        GestureArea::new(panel, Message::Gesture).into()
+        GestureArea::new(panel, Message::Gesture)._boxed()
     }
 }
 
@@ -225,9 +225,12 @@ struct GestureArea<'a> {
 }
 
 impl<'a> GestureArea<'a> {
-    fn new(content: impl Into<Element<'a, Message>>, on_gesture: fn(Gesture) -> Message) -> Self {
+    fn new(
+        content: impl Widget<Message, Theme, Renderer> + 'a,
+        on_gesture: fn(Gesture) -> Message,
+    ) -> Self {
         Self {
-            content: content.into(),
+            content: content._boxed(),
             on_gesture,
         }
     }
@@ -235,7 +238,7 @@ impl<'a> GestureArea<'a> {
 
 impl Widget<Message, Theme, Renderer> for GestureArea<'_> {
     fn size(&self) -> Size<Length> {
-        self.content.as_widget().size()
+        self.content.size()
     }
 
     fn tag(&self) -> tree::Tag {
@@ -246,26 +249,20 @@ impl Widget<Message, Theme, Renderer> for GestureArea<'_> {
         tree::State::new(GestureReceiver::new())
     }
 
-    fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
+    fn diff(&mut self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_mut(&mut self.content));
     }
 
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content));
-    }
-
-    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
-        let content = self
-            .content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits);
-        Node::with_children(content.size(), vec![content])
+    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) {
+        self.content.layout(&mut tree.children[0], renderer, limits);
+        tree.size = tree.children[0].size;
     }
 
     fn operate(
         &mut self,
         tree: &mut Tree,
-        layout: Layout<'_>,
+        layout: Layout,
+        viewport: &Rectangle,
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
@@ -275,10 +272,16 @@ impl Widget<Message, Theme, Renderer> for GestureArea<'_> {
             layout.bounds(),
             tree.state.downcast_mut::<GestureReceiver>(),
         );
+        let content_layout = layout
+            .iter(&tree.children)
+            .next()
+            .expect("gesture content exists")
+            .0;
         operation.traverse(&mut |operation| {
-            self.content.as_widget_mut().operate(
+            self.content.operate(
                 &mut tree.children[0],
-                layout.children().next().unwrap(),
+                content_layout,
+                viewport,
                 renderer,
                 operation,
             );
@@ -289,10 +292,9 @@ impl Widget<Message, Theme, Renderer> for GestureArea<'_> {
         &mut self,
         tree: &mut Tree,
         event: &Event,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: mouse::Cursor,
         renderer: &Renderer,
-        clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         viewport: &Rectangle,
     ) {
@@ -302,13 +304,17 @@ impl Widget<Message, Theme, Renderer> for GestureArea<'_> {
         while let Some(gesture) = receiver.take() {
             shell.publish((self.on_gesture)(gesture));
         }
-        self.content.as_widget_mut().update(
+        let content_layout = layout
+            .iter(&tree.children)
+            .next()
+            .expect("gesture content exists")
+            .0;
+        self.content.update(
             &mut tree.children[0],
             event,
-            layout.children().next().unwrap(),
+            content_layout,
             cursor,
             renderer,
-            clipboard,
             shell,
             viewport,
         );
@@ -320,24 +326,24 @@ impl Widget<Message, Theme, Renderer> for GestureArea<'_> {
         renderer: &mut Renderer,
         theme: &Theme,
         style: &renderer::Style,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        self.content.as_widget().draw(
+        self.content.draw(
             &tree.children[0],
             renderer,
             theme,
             style,
-            layout.children().next().unwrap(),
+            layout
+                .iter(&tree.children)
+                .next()
+                .expect("gesture content exists")
+                .0,
             cursor,
             viewport,
         );
     }
 }
 
-impl<'a> From<GestureArea<'a>> for Element<'a, Message> {
-    fn from(area: GestureArea<'a>) -> Self {
-        Element::new(area)
-    }
-}
+impl iced::advanced::widget::Meta for GestureArea<'_> {}

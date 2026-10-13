@@ -397,7 +397,7 @@ impl Operation for FindReceiver {
         &mut self,
         _id: Option<&Id>,
         bounds: Rectangle,
-        _content_bounds: Rectangle,
+        _content_bounds: iced_core::Size,
         translation: Vector,
         _state: &mut dyn Scrollable,
     ) {

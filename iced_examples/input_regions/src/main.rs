@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use iced::widget::{button, row};
 use iced::{Color, Element, Length, Task as Command};
 use iced_exwlshell::actions::ActionCallback;
@@ -68,14 +69,14 @@ impl InputRegionExample {
         .padding(20)
         .spacing(10)
         .width(Length::Fill)
-        .into()
+        ._boxed()
     }
 
     fn style(&self, theme: &iced::Theme) -> iced::theme::Style {
         use iced::theme::Style;
         Style {
             background_color: Color::from_rgba(0.3, 0.3, 0.3, 0.3),
-            text_color: theme.palette().text,
+            text_color: theme.palette().background.base.text,
         }
     }
 }

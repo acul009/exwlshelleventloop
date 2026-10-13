@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use iced::widget::{button, row, text};
 use iced::{Element, Length, Task as Command};
 use iced_exwlshell::get_wlconnection;
@@ -187,7 +188,7 @@ impl Bar {
 
     fn view(&self) -> Element<'_, Message> {
         if self.workspaces.is_none() {
-            return text(&self.status).into();
+            return text(&self.status)._boxed();
         }
         // as of 03/08/26 only cosmic and a few unstble/minor compositors
         // support `CreateWorkspace`
@@ -228,13 +229,13 @@ impl Bar {
             button(text(label))
                 .style(style)
                 .on_press_maybe(press)
-                .into()
+                ._boxed()
         }))
         .spacing(4);
 
         row![slots, text(&self.status)]
             .spacing(12)
             .width(Length::Fill)
-            .into()
+            ._boxed()
     }
 }

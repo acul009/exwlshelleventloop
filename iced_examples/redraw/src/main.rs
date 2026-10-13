@@ -4,12 +4,10 @@ use iced::Length;
 use iced::Rectangle;
 use iced::Shadow;
 use iced::Size;
-use iced::advanced::Clipboard;
 use iced::advanced::Layout;
 use iced::advanced::Shell;
 use iced::advanced::Widget;
 use iced::advanced::layout::Limits;
-use iced::advanced::layout::Node;
 use iced::advanced::renderer;
 use iced::advanced::widget::Tree;
 use iced::advanced::widget::tree::State;
@@ -51,7 +49,7 @@ impl Panel {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        container(LoadingBar::default()).into()
+        container(LoadingBar::default())._boxed()
     }
 }
 
@@ -90,12 +88,12 @@ where
         Size::new(self.width, self.height)
     }
 
-    fn layout(&mut self, _tree: &mut Tree, _renderer: &Renderer, limits: &Limits) -> Node {
-        Node::new(limits.width(self.width).height(self.height).resolve(
+    fn layout(&mut self, tree: &mut Tree, _renderer: &Renderer, limits: &Limits) {
+        tree.size = limits.width(self.width).height(self.height).resolve(
             self.width,
             self.height,
             Size::new(f32::INFINITY, f32::INFINITY),
-        ))
+        );
     }
 
     fn draw(
@@ -104,7 +102,7 @@ where
         renderer: &mut Renderer,
         _theme: &Theme,
         _style: &renderer::Style,
-        layout: Layout<'_>,
+        layout: Layout,
         _cursor: Cursor,
         _viewport: &Rectangle,
     ) {
@@ -149,10 +147,9 @@ where
         &mut self,
         state: &mut Tree,
         event: &iced::Event,
-        layout: Layout<'_>,
+        layout: Layout,
         _cursor: Cursor,
         _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
@@ -181,11 +178,4 @@ where
     }
 }
 
-impl<'a, Message, Theme, Renderer> From<LoadingBar> for Element<'a, Message, Theme, Renderer>
-where
-    Renderer: renderer::Renderer + 'a,
-{
-    fn from(spinner: LoadingBar) -> Self {
-        Self::new(spinner)
-    }
-}
+impl iced::advanced::widget::Meta for LoadingBar {}

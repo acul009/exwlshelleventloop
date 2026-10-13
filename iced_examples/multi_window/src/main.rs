@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use iced::alignment::Vertical;
 use iced::widget::{
     button, center, column, container, operation, row, scrollable, space, text, text_input,
@@ -170,9 +171,9 @@ impl Example {
 
     fn view(&self, window_id: window::Id) -> Element<'_, Message> {
         if let Some(window) = self.windows.get(&window_id) {
-            center(window.view(window_id)).into()
+            center(window.view(window_id))._boxed()
         } else {
-            space::horizontal().into()
+            space::horizontal()._boxed()
         }
     }
 
@@ -258,6 +259,6 @@ impl Window {
             .align_x(Center),
         );
 
-        container(content).center_x(200).into()
+        container(content).center_x(200)._boxed()
     }
 }

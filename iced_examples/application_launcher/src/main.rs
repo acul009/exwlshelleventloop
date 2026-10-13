@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 mod applications;
 mod systemd;
 use applications::{App, all_apps};
@@ -173,7 +174,7 @@ impl Launcher {
             .on_input(Message::SearchEditChanged)
             .on_submit(Message::SearchSubmit)
             .id(INPUT_ID.clone())
-            .into();
+            ._boxed();
         let bottom_vec: Vec<Element<Message>> = self
             .apps
             .iter()
@@ -193,7 +194,7 @@ impl Launcher {
             .collect();
         let bottom: Element<Message> = scrollable(column(bottom_vec).width(Length::Fill))
             .id(SCROLLABLE_ID.clone())
-            .into();
-        column![text_ip, bottom].into()
+            ._boxed();
+        column![text_ip, bottom]._boxed()
     }
 }

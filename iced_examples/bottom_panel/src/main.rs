@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 mod applications;
 mod systemd;
 use applications::{App, all_apps};
@@ -68,14 +69,14 @@ impl Panel {
             .collect();
 
         let row = row(bottom_vec);
-        container(row).into()
+        container(row)._boxed()
     }
 
     fn style(&self, theme: &iced::Theme) -> iced::theme::Style {
         use iced::theme::Style;
         Style {
             background_color: Color::TRANSPARENT,
-            text_color: theme.palette().text,
+            text_color: theme.palette().background.base.text,
         }
     }
 }

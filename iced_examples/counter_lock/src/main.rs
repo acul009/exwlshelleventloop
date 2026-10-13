@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use iced::widget::{Space, button, column, text, text_input};
 use iced::{Alignment, Element, Event, Length, Task as Command, event};
 use iced_exwlshell::sessionlock::application;
@@ -74,6 +75,6 @@ impl Counter {
         .align_x(Alignment::Center)
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        ._boxed()
     }
 }

@@ -22,7 +22,6 @@ use crate::actions::ExwlShellCustomActionWithId;
 use iced_core::Settings;
 use iced_program::Program;
 
-use iced_core::Element;
 use iced_runtime::Task;
 
 struct ProgramWrapper<P: Program> {
@@ -63,7 +62,7 @@ impl<P: Program> Program for ProgramWrapper<P> {
         &self,
         state: &'a Self::State,
         window: iced_core::window::Id,
-    ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+    ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
         self.program.view(state, window)
     }
 

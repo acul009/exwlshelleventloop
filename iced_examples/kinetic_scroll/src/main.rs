@@ -1,8 +1,8 @@
 use std::time::Instant;
 
-use iced::advanced::layout::{Layout, Limits, Node};
+use iced::advanced::layout::{Layout, Limits};
 use iced::advanced::widget::{Operation, Tree, tree};
-use iced::advanced::{Clipboard, Renderer as _, Shell, Widget, renderer};
+use iced::advanced::{Renderer as _, Shell, Widget, renderer};
 use iced::widget::{Column, container, text};
 use iced::{
     Color, Element, Event, Length, Rectangle, Renderer, Size, Task, Theme, Vector, mouse, window,
@@ -46,9 +46,9 @@ fn view(_: &Rows) -> Element<'_, Message> {
             .padding(12)
             .width(Length::Fill)
             .style(move |_: &Theme| container::background(Color::from_rgb(shade, shade, shade)))
-            .into()
+            ._boxed()
     });
-    Kinetic::new(Column::with_children(rows)).into()
+    Kinetic::new(Column::with_children(rows))._boxed()
 }
 
 /// Pixels per wheel step.
@@ -72,9 +72,9 @@ struct Kinetic<'a> {
 }
 
 impl<'a> Kinetic<'a> {
-    fn new(content: impl Into<Element<'a, Message>>) -> Self {
+    fn new(content: impl Widget<Message, Theme, Renderer> + 'a) -> Self {
         Self {
-            content: content.into(),
+            content: content._boxed(),
         }
     }
 }
@@ -142,38 +142,41 @@ impl Widget<Message, Theme, Renderer> for Kinetic<'_> {
         })
     }
 
-    fn children(&self) -> Vec<Tree> {
-        vec![Tree::new(&self.content)]
+    fn diff(&mut self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_mut(&mut self.content));
     }
 
-    fn diff(&self, tree: &mut Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content));
-    }
-
-    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
+    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) {
         let size = limits.resolve(Length::Fill, Length::Fill, Size::ZERO);
-        let content = self.content.as_widget_mut().layout(
+        self.content.layout(
             &mut tree.children[0],
             renderer,
             &Limits::new(Size::ZERO, Size::new(size.width, f32::INFINITY)),
         );
-        Node::with_children(size, vec![content])
+        tree.size = size;
     }
 
     fn operate(
         &mut self,
         tree: &mut Tree,
-        layout: Layout<'_>,
+        layout: Layout,
+        viewport: &Rectangle,
         renderer: &Renderer,
         operation: &mut dyn Operation,
     ) {
         // Exposes the receiver so the runtime can deliver touchpad gestures to it.
         let state = tree.state.downcast_mut::<State>();
         operation.custom(None, layout.bounds(), &mut state.receiver);
+        let content_layout = layout
+            .iter(&tree.children)
+            .next()
+            .expect("kinetic content exists")
+            .0;
         operation.traverse(&mut |operation| {
-            self.content.as_widget_mut().operate(
+            self.content.operate(
                 &mut tree.children[0],
-                layout.children().next().unwrap(),
+                content_layout,
+                viewport,
                 renderer,
                 operation,
             );
@@ -184,16 +187,20 @@ impl Widget<Message, Theme, Renderer> for Kinetic<'_> {
         &mut self,
         tree: &mut Tree,
         event: &Event,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: mouse::Cursor,
         _renderer: &Renderer,
-        _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
         let state = tree.state.downcast_mut::<State>();
         let bounds = layout.bounds();
-        let content = layout.children().next().unwrap().bounds();
+        let content = layout
+            .iter(&tree.children)
+            .next()
+            .expect("kinetic content exists")
+            .0
+            .bounds();
         let max_offset = (content.height - bounds.height).max(0.0);
 
         // The runtime requests a redraw after delivering a gesture, so this runs soon after the
@@ -281,7 +288,7 @@ impl Widget<Message, Theme, Renderer> for Kinetic<'_> {
         renderer: &mut Renderer,
         theme: &Theme,
         style: &renderer::Style,
-        layout: Layout<'_>,
+        layout: Layout,
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
@@ -292,12 +299,16 @@ impl Widget<Message, Theme, Renderer> for Kinetic<'_> {
         let translation = Vector::new(0.0, state.offset);
         renderer.with_layer(visible, |renderer| {
             renderer.with_translation(-translation, |renderer| {
-                self.content.as_widget().draw(
+                self.content.draw(
                     &tree.children[0],
                     renderer,
                     theme,
                     style,
-                    layout.children().next().unwrap(),
+                    layout
+                        .iter(&tree.children)
+                        .next()
+                        .expect("kinetic content exists")
+                        .0,
                     cursor + translation,
                     &(visible + translation),
                 );
@@ -306,8 +317,4 @@ impl Widget<Message, Theme, Renderer> for Kinetic<'_> {
     }
 }
 
-impl<'a> From<Kinetic<'a>> for Element<'a, Message> {
-    fn from(kinetic: Kinetic<'a>) -> Self {
-        Element::new(kinetic)
-    }
-}
+impl iced::advanced::widget::Meta for Kinetic<'_> {}

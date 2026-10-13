@@ -1,6 +1,5 @@
 use super::{BootFn, NameSpace, SingleApplication, ViewFn};
 use crate::{DefaultStyle, ExWlSettings, actions::ExwlShellCustomActionWithId};
-use iced_core::Element;
 use iced_debug as debug;
 use iced_futures::Subscription;
 use iced_program::Program;
@@ -96,11 +95,12 @@ where
             &self,
             state: &'a Self::State,
             _window: iced_core::window::Id,
-        ) -> Element<'a, Self::Message, Self::Theme, Self::Renderer> {
+        ) -> impl iced_core::Widget<Self::Message, Self::Theme, Self::Renderer> + 'a {
+            use iced_core::Widget as _;
             debug::hot(|| {
                 self.view
                     .view(state)
-                    .map(|message| (message, Instant::now()))
+                    ._map(|message| (message, Instant::now()))
             })
         }
 

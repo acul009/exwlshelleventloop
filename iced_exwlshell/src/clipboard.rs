@@ -1,8 +1,13 @@
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::{
+    fmt,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use exwlshellev::WindowWrapper;
-use iced_core::Clipboard;
-use iced_core::clipboard::Kind;
+use iced_core::clipboard::{Content, Error, Kind};
 
 static DISABLED: AtomicBool = AtomicBool::new(false);
 
@@ -24,7 +29,7 @@ enum State {
 }
 
 impl ExwlShellClipboard {
-    /// Creates a new [`Clipboard`] for the given window.
+    /// Creates a new [`ExwlShellClipboard`] for the given window.
     pub fn connect(window: &WindowWrapper) -> Self {
         #[allow(unsafe_code)]
         let state = unsafe { window_clipboard::Clipboard::connect(window) }
@@ -35,7 +40,7 @@ impl ExwlShellClipboard {
         Self { state }
     }
 
-    /// Creates a new [`Clipboard`] that isn't associated with a window.
+    /// Creates a new [`ExwlShellClipboard`] that isn't associated with a window.
     /// This clipboard will never contain a copied value.
     #[allow(unused)]
     pub fn unconnected() -> Self {
@@ -44,44 +49,31 @@ impl ExwlShellClipboard {
         }
     }
 
-    /// Reads the current content of the [`Clipboard`] as text.
-    pub fn read(&self, kind: Kind) -> Option<String> {
+    /// Reads the current content of the [`ExwlShellClipboard`] as text.
+    pub fn read(&self, kind: Kind) -> Result<Content, Error> {
         match &self.state {
             State::Connected(clipboard) => match kind {
-                Kind::Standard => clipboard.read().ok(),
-                Kind::Primary => clipboard.read_primary().and_then(Result::ok),
+                Kind::Text => clipboard.read().map(Content::Text).map_err(map_error),
+                _ => Err(Error::ContentNotAvailable),
             },
-            State::Unavailable => None,
+            State::Unavailable => Err(Error::ClipboardUnavailable),
         }
     }
 
-    /// Writes the given text contents to the [`Clipboard`].
-    pub fn write(&mut self, kind: Kind, contents: String) {
+    /// Writes the given text contents to the [`ExwlShellClipboard`].
+    pub fn write(&mut self, content: Content) -> Result<(), Error> {
         match &mut self.state {
-            State::Connected(clipboard) => {
-                let result = match kind {
-                    Kind::Standard => clipboard.write(contents),
-                    Kind::Primary => clipboard.write_primary(contents).unwrap_or(Ok(())),
-                };
-
-                match result {
-                    Ok(()) => {}
-                    Err(error) => {
-                        log::warn!("error writing to clipboard: {error}");
-                    }
-                }
-            }
-            State::Unavailable => {}
+            State::Connected(clipboard) => match content {
+                Content::Text(text) => clipboard.write(text).map_err(map_error),
+                _ => Err(Error::ConversionFailure),
+            },
+            State::Unavailable => Err(Error::ClipboardUnavailable),
         }
     }
 }
 
-impl Clipboard for ExwlShellClipboard {
-    fn read(&self, kind: Kind) -> Option<String> {
-        self.read(kind)
-    }
-
-    fn write(&mut self, kind: Kind, contents: String) {
-        self.write(kind, contents);
+fn map_error(error: impl fmt::Display) -> Error {
+    Error::Unknown {
+        description: Arc::new(error.to_string()),
     }
 }

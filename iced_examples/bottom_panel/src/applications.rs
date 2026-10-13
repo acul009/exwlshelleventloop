@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
@@ -32,18 +33,18 @@ impl App {
                     image(image::Handle::from_path(path))
                         .width(Length::Fixed(80.))
                         .height(Length::Fixed(80.))
-                        .into()
+                        ._boxed()
                 } else {
                     svg(svg::Handle::from_path(path))
                         .width(Length::Fixed(40.))
                         .height(Length::Fixed(40.))
-                        .into()
+                        ._boxed()
                 }
             }
             None => svg(svg::Handle::from_memory(DEFAULT_ICON))
                 .width(Length::Fixed(40.))
                 .height(Length::Fixed(40.))
-                .into(),
+                ._boxed(),
         }
     }
 
@@ -74,7 +75,7 @@ impl App {
                 },
                 snap: true,
             })
-            .into()
+            ._boxed()
     }
 }
 

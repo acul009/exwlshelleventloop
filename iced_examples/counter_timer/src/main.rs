@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use iced::widget::{button, column, row, text, text_input};
 use iced::{Alignment, Color, Element, Event, Length, Subscription, Task as Command};
 use iced_exwlshell::ExWlSettings;
@@ -135,13 +136,13 @@ fn view<'a>(counter: &'a Counter) -> Element<'a, Message> {
     .spacing(10)
     .width(Length::Fill)
     .height(Length::Fill)
-    .into()
+    ._boxed()
 }
 
 fn style(_counter: &Counter, theme: &iced::Theme) -> iced::theme::Style {
     use iced::theme::Style;
     Style {
         background_color: Color::TRANSPARENT,
-        text_color: theme.palette().text,
+        text_color: theme.palette().background.base.text,
     }
 }

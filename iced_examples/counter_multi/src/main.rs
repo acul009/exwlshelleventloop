@@ -1,3 +1,4 @@
+use iced::advanced::Widget as _;
 use std::collections::HashMap;
 
 use iced::widget::{button, column, container, row, text, text_input};
@@ -277,7 +278,7 @@ impl Counter {
 
     fn view(&self, id: iced::window::Id) -> Element<'_, Message> {
         if let Some(WindowInfo::Left) = self.id_info(id) {
-            return button("close left").on_press(Message::Close(id)).into();
+            return button("close left").on_press(Message::Close(id))._boxed();
         }
         if let Some(WindowInfo::NormalWindow) = self.id_info(id) {
             return container(
@@ -293,10 +294,10 @@ impl Counter {
             .center_y(Length::Fill)
             .center_x(Length::Fill)
             .height(Length::Fill)
-            .into();
+            ._boxed();
         }
         if let Some(WindowInfo::TopBar) = self.id_info(id) {
-            return text("hello here is topbar").into();
+            return text("hello here is topbar")._boxed();
         }
         if let Some(WindowInfo::PopUp) = self.id_info(id) {
             return container(
@@ -321,7 +322,7 @@ impl Counter {
             })
             .width(Length::Fill)
             .height(Length::Fill)
-            .into();
+            ._boxed();
         }
         let center = column![
             button("Increment").on_press(Message::IncrementPressed(id)),
@@ -359,7 +360,7 @@ impl Counter {
         .spacing(10)
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        ._boxed()
     }
 }
 
